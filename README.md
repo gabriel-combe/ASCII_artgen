@@ -2,7 +2,7 @@
 
 ASCIIXEL can generate images an videos using ASCII character or large pixels (with the option to add colour)
 
-https://www.youtube.com/watch?v=nAvhP0ASKRY
+[![Watch the video](https://img.youtube.com/vi/nAvhP0ASKRY/maxresdefault.jpg)](https://youtu.be/nAvhP0ASKRY)
 
 ## Installation
 
