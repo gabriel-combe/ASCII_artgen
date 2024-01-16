@@ -1,6 +1,9 @@
+# OpenCV only
+
 import cv2
 import numpy as np
 
+# Different density list for the ASCII conversion
 DENSITY29_WS = np.array(["Ñ","@","#","W","$","9","8","7","6","5","4","3","2","1","0","?","!","a","b","c",";",":","+","=","-",",",".","_"," "])
 DENSITY29_BS = np.flip(DENSITY29_WS)
 DENSITY29_BS_EXTEND = np.concatenate((DENSITY29_BS, np.array(["Ñ","Ñ","Ñ","Ñ","Ñ","Ñ","Ñ","Ñ","Ñ","Ñ"])))
@@ -9,9 +12,11 @@ DENSITY70_WS = np.array(["$","@","B","%","8","&","W","M","#","*","o","a","h","k"
 DENSITY70_BS = np.flip(DENSITY29_WS)
 DENSITY = [DENSITY70_WS, DENSITY70_BS, DENSITY29_WS, DENSITY29_BS, DENSITY29_BS_EXTEND]
 
+# Generate an empty frame
 def generate_empty_image(width, heigth):
     return np.zeros((heigth, width, 1), dtype=np.uint8)
 
+# Convert a frame to its equivalent in ASCII format
 def frame2ascii(frame, density_type):
     matrix = map(np.asarray(frame), 0, 255, 0, len(DENSITY[density_type])-1).astype(int)
     ascii_frame = np.array(DENSITY[density_type][matrix], dtype=str)
@@ -21,14 +26,17 @@ def map(lum, smin, smax, fmin, fmax):
     scale = (fmax - fmin) / (smax - smin)
     return lum*scale
 
+# Display the converted frame in an opencv window
 def ascii_formatter(ascii_frame, img, scale_ascii, scale_display):
     for line in range(len(ascii_frame)):
         for col in range(len(ascii_frame[0])):
             cv2.putText(img=img, text=ascii_frame[line][col], org=(col*scale_ascii//scale_display,line*scale_ascii//scale_display), fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=scale_ascii/(20*scale_display), color=(255,255,255))
 
+# Save the image sequence in a video file
 def save_ImageSequence(frame, name, extention, frame_count, path=''):
     cv2.imwrite(path+name+"_"+str(frame_count)+"."+extention, frame)
 
+# Load the video (with user question)
 def loadVideo():
     path = input('What is the path of your video: ')
     cap = cv2.VideoCapture(path)
@@ -41,6 +49,7 @@ def loadVideo():
 
     return cap, width, height
 
+# Selection of options (density, contrast, output display, and saving)
 def options():
     scale_ascii = int(input('\nChoose the scale of the ASCII characters (default 8): '))
     scale_display = input('Choose the scale factor of the display output (default 1.0): ')
@@ -57,11 +66,13 @@ def options():
 
     return scale_ascii, scale_display, density_type, contrast, show_output, save
 
+# Output options
 def outputInfo():
     sequence_name = str(input('Name format of your output sequence: '))
     sequence_path = str(input('Ouput path of your sequence: '))
     return sequence_name, sequence_path
 
+# main function for ASCII generation
 def ASCIIGenerator(cap, density_type, scale_ascii, scale_display, show_output=True, save=False, sequence_name=None, sequence_path=None):
     if not cap.isOpened():
         print("Cannot open camera/video file")
@@ -101,6 +112,7 @@ def ASCIIGenerator(cap, density_type, scale_ascii, scale_display, show_output=Tr
     cap.release()
     cv2.destroyAllWindows()
 
+# Start of the app
 if __name__=="__main__":
     sequence_name = None
     sequence_path = None
