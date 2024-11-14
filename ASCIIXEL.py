@@ -1,88 +1,67 @@
-from numba import njit
-from enum import Enum
-import pygame.gfxdraw
-import pygame as pg
+from PIL import Image, ImageFont, ImageDraw
+from utils import ASCII_CHARS_TAB, OutputType, accelerate_conversion_ascii, accelerate_conversion_ascii_colour, accelerate_conversion_pixel, createFolder, createVideo
 import numpy as np
 import cv2
 
-# List of sets of characters to use for the ASCII generation
-ASCII_CHARS_TAB = [' .\'`^":;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$', ' _.,-=+:;cba!?0123456789$W#@Ñ', ' ixzao*#MW&8%B@$', ' .",:;!~+-xmo*#W&8@', '  12345678#@']
-
-# Types of style
-# Classic ASCII (no colour)
-# ASCII with colour
-# Pixel with colour
-class OutputType(Enum):
-    ASCII = 'ascii'
-    ASCII_COLOUR = 'ascii_colour'
-    PIXEL_ART = 'pixel_art'
-
-# Conversion of an image into classic ASCII
-@njit(fastmath=True)
-def accelerate_conversion_ascii(image: np.ndarray, width: int, height: int, ascii_coeff: float, step: int, skip_index: int) -> list:
-    array_of_values = []
-    for x in range(0, width, step[0]):
-        for y in range(0, height, step[1]):
-            char_index = int(image[x,y] * ascii_coeff)
-            if char_index != skip_index:
-                array_of_values.append((char_index, (x,y)))
-    return array_of_values
-
-# Conversion of an image into colour ASCII
-@njit(fastmath=True)
-def accelerate_conversion_ascii_colour(image: np.ndarray, gray_image: np.ndarray, width: int, height: int, ascii_coeff: float, colour_coeff: float, step: int, skip_index: int) -> list:
-    array_of_values = []
-    for x in range(0, width, step[0]):
-        for y in range(0, height, step[1]):
-            char_index = int(gray_image[x,y] * ascii_coeff)
-            if char_index != skip_index:
-                r, g, b = image[x,y]//colour_coeff
-                array_of_values.append((char_index, (r, g, b), (x,y)))
-    return array_of_values
-
-# Conversion of an image into pixel art with colour
-@njit(fastmath=True)
-def accelerate_conversion_pixel(image: np.ndarray, width: int, height: int, colour_coeff: float, step: int) -> list:
-    array_of_values = []
-    for x in range(0, width, step):
-        for y in range(0, height, step):
-            r, g, b = image[x,y]//colour_coeff
-            if r+g+b:
-                array_of_values.append(((r, g, b), (x,y)))
-    return array_of_values
 
 # ASCIIXEL class for images and videos ASCII conversion
 class ASCIIXEL:
-    def __init__(self, path, ascii_set=2, font_size=12, display_original=True, resolution=None, record=False, reverse_colour=False, output_type=OutputType.ASCII, colour_lvl=8, pixel_size=7) -> None:
-        pg.init()
-
+    def __init__(self, path='', ascii_set=2, element_size=12, display_original=True, resolution=None, record=False, reverse_colour=False, output_type=OutputType.ASCII, colour_lvl=8) -> None:
         self.path = path
-        self.name = self.path.split('/')[-1].split('.')[0]
         self.output_type = output_type
         self.reverse_colour = reverse_colour
-
-        # Video/Image setup
-        self.cap = cv2.VideoCapture(path)
+        self.custom_resolution = resolution
         self.display_original = display_original
-        self.RES = resolution
-        self.image, _ = self.get_image()
+        self.ascii_set = ascii_set
+        self.record = record
+
+        self.WIDTH = None
+        self.nb_frame = 0
+        self.finish = False
+
+        # Character settings
+        self.draw_char = self.draw_ascii
+        self.colour_lvl = colour_lvl
+
+        # Character display settings
+        self.element_size = element_size
+
+    def setup(self) -> bool:
+        if self.path == '': return False
+
+        self.name = self.path.split('/')[-1].split('.')[0]
+        self.output_name = f'ASCIIXEL_{self.name}_{self.output_type.value}'
+        self.current_element_size = self.element_size
+        
+        # Video/Image setup
+        self.cap = cv2.VideoCapture(self.path)
+        self.get_image()
+
+        # Character display settings
+        self.font = ImageFont.load_default(size=self.current_element_size)
 
         # Screen settings
-        self.WIDTH, self.HEIGHT = self.image.shape[0], self.image.shape[1]
-        self.original_ratio = self.HEIGHT/self.WIDTH
-        if not self.RES: self.RES = self.WIDTH, self.HEIGHT
-        else: self.WIDTH, self.HEIGHT = self.RES[0], self.RES[1]
-        
+        if self.custom_resolution:
+            self.ORIGWIDTH, self.ORIGHEIGHT = self.custom_resolution
+        else:
+            self.ORIGWIDTH, self.ORIGHEIGHT = self.image.shape[0], self.image.shape[1]
+
+        self.WIDTH, self.HEIGHT = self.ORIGWIDTH//self.current_element_size, self.ORIGHEIGHT//self.current_element_size
+
+        self.original_ratio = self.ORIGHEIGHT/self.ORIGWIDTH
         self.ratio = self.HEIGHT/self.WIDTH
+
+        # Resize first frame
+        self.image = cv2.resize(self.image, (self.WIDTH, self.HEIGHT), interpolation=cv2.INTER_AREA)
+        self.grayscale = cv2.resize(self.grayscale, (self.WIDTH, self.HEIGHT), interpolation=cv2.INTER_AREA)
 
         # Display settings
         self.bg = 'white' if self.reverse_colour else 'black'
-        self.surface = pg.display.set_mode(self.RES)
-        self.clock = pg.time.Clock()
+        self.fg = 'black' if self.reverse_colour else 'white'
 
         # Selection of the character sets
-        self.ASCII_CHARS = ASCII_CHARS_TAB[ascii_set]
-        
+        self.ASCII_CHARS = ASCII_CHARS_TAB[self.ascii_set]
+
         # Reverse the ASCII density if reverse_colour argument is true
         self.skip_index = 0
         if self.reverse_colour: 
@@ -90,134 +69,103 @@ class ASCIIXEL:
             self.skip_index = len(self.ASCII_CHARS)-1
         self.ASCII_COEFF = (len(self.ASCII_CHARS)-1)/255
 
-        # Character display settings
-        self.font_size = int(font_size * self.ratio/self.original_ratio)
-        self.font = pg.font.SysFont('Courier', self.font_size, bold=True)
-
-        # Character settings (spacing and colour)
-        self.CHAR_STEP = (int(self.font_size * 0.5), int(self.font_size * 0.8))
-        self.PALETTE = [self.font.render(char, False, 'black' if self.reverse_colour else 'white') for char in self.ASCII_CHARS]
-        self.draw_char = self.draw_ascii
-        self.COLOUR_LVL = colour_lvl
-
         # Selection of the style
         if self.output_type == OutputType.ASCII_COLOUR:
-            self.PALETTE, self.COLOUR_COEFF = self.create_palette()
             self.draw_char = self.draw_ascii_colour
         elif self.output_type == OutputType.PIXEL_ART:
-            self.PIXEL_SIZE = pixel_size
-            self.PALETTE, self.COLOUR_COEFF = self.create_palette()
             self.draw_char = self.draw_pixel
+
+        # Create output image
+        self.out_image = Image.new('RGB', (self.ORIGWIDTH, self.ORIGHEIGHT), self.bg)
+        self.img_draw = ImageDraw.Draw(self.out_image)
 
         # Recording settings
         self.rec_fps =  self.cap.get(cv2.CAP_PROP_FPS)
-        self.record = record
-        self.recorder = cv2.VideoWriter(f'outputs/ascii_{self.name}_{self.output_type.value}.mp4', cv2.VideoWriter_fourcc(*'mp4v'), self.rec_fps, self.RES)
-    
-    # Retrieve a frame from the pygame window
-    def get_frame(self) -> np.ndarray:
-        frame = pg.surfarray.array3d(self.surface)
-        frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        return cv2.transpose(frame)
-    
-    # Record the output frame by frame into an mp4 file
-    def record_frame(self) -> None:
+        
         if self.record:
-            frame = self.get_frame()
-            self.recorder.write(frame)
-            cv2.imshow(f'outputs/ascii_{self.name}_{self.output_type.value}.mp4', frame)
-            if cv2.waitKey(1) & 0xFF == 27:
-                self.record = not self.record
-                cv2.destroyAllWindows()
+            createFolder()
+
+        return True
     
-    # Draw the classic ASCII on the pygame window
-    def draw_ascii(self) -> None:
-        _, gray_image = self.get_image()
-        array_of_values = accelerate_conversion_ascii(gray_image, self.WIDTH, self.HEIGHT, self.ASCII_COEFF, self.CHAR_STEP, self.skip_index)
-        for char_index, pos in array_of_values:
-            self.surface.blit(self.PALETTE[char_index], pos)
+    def reset(self) -> None:
+        self.WIDTH = None
+        self.nb_frame = 0
+        self.finish = False
     
-    # Draw the colour ASCII on the pygame window
-    def draw_ascii_colour(self) -> None:
-        image, gray_image = self.get_image()
-        array_of_values = accelerate_conversion_ascii_colour(image, gray_image, self.WIDTH, self.HEIGHT, self.ASCII_COEFF, self.COLOUR_COEFF, self.CHAR_STEP, self.skip_index)
-        for char_index, colour, pos in array_of_values:
-            char = self.ASCII_CHARS[char_index]
-            self.surface.blit(self.PALETTE[char][colour], pos)
-    
-    # Draw the pixel art on the pygame window
-    def draw_pixel(self) -> None:
-        image, _ = self.get_image()
-        array_of_values = accelerate_conversion_pixel(image, self.WIDTH, self.HEIGHT, self.COLOUR_COEFF, self.PIXEL_SIZE)
-        for colour_key, (x, y) in array_of_values:
-            pygame.gfxdraw.box(self.surface, (x, y, self.PIXEL_SIZE, self.PIXEL_SIZE), self.PALETTE[colour_key])
-    
-    # Create a colour palette for the ASCII/pixel
-    def create_palette(self) -> tuple[dict, int]:
-        colours, colour_coeff = np.linspace(0, 255, num=self.COLOUR_LVL, dtype=int, retstep=True)
-        colour_coeff = int(colour_coeff)
-
-        colour_palette = [np.array([r, g, b]) for r in colours for g in colours for b in colours]
-
-        palette_char = dict.fromkeys(self.ASCII_CHARS, None)
-        palette_pixel = {}
-
-        for char in palette_char:
-            char_palette = {}
-            for colour in colour_palette:
-                colour_key = tuple(colour // colour_coeff)
-                char_palette[colour_key] = self.font.render(char, False, tuple(colour))
-                palette_pixel[colour_key] = colour
-
-            if self.output_type == OutputType.PIXEL_ART: break
-            palette_char[char] = char_palette
-
-        return palette_char if not self.output_type == OutputType.PIXEL_ART else palette_pixel, colour_coeff
-
     # Retrieve a frame from a video/image
-    def get_image(self) -> tuple[np.ndarray, np.ndarray]:
+    def get_image(self) -> None:
         ret, self.cv2_image = self.cap.read()
-        if not ret: exit()
-        if self.RES: self.cv2_image = cv2.resize(self.cv2_image, self.RES, interpolation=cv2.INTER_AREA)
-        transposed_image = cv2.transpose(self.cv2_image)
-        image = cv2.cvtColor(transposed_image, cv2.COLOR_BGR2RGB)
-        gray_image = cv2.cvtColor(transposed_image, cv2.COLOR_BGR2GRAY)
-        return image, gray_image
-    
-    # Draw the original frame in an opencv window
-    def draw_cv2_image(self) -> None:
-        resized_cv2_image = cv2.resize(self.cv2_image, (720, int(720 * self.ratio)), interpolation=cv2.INTER_AREA)
-        cv2.imshow('img', resized_cv2_image)
-    
-    # Draw the converted frame in the pygame window
-    def draw(self) -> None:
-        self.surface.fill(self.bg)
-        self.draw_char()
-        if self.display_original: self.draw_cv2_image()
-    
-    # Save an image in jpg format
-    def save_image(self) -> None:
-        pygame_image = pg.surfarray.array3d(self.surface)
-        cv2_img = cv2.transpose(pygame_image)
-        cv2_img = cv2.cvtColor(cv2_img, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(f'outputs/ascii_{self.name}_{self.output_type.value}.jpg', cv2_img)
-    
-    # Run the main loop/algorithm
-    def run(self) -> None:
-        while True:
-            for i in pg.event.get():
-                if i.type == pg.QUIT: exit()
-                elif i.type == pg.KEYDOWN:
-                    if i.key == pg.K_s: self.save_image()
-                    if i.key == pg.K_r: self.record = not self.record
-            
-            self.record_frame()
-            self.draw()
-            pg.display.set_caption(str(self.clock.get_fps()))
-            pg.display.flip()
-            self.clock.tick(self.rec_fps if not self.record else 0)
+        if not ret:
+            self.finish = True
+            return
 
-#TODO make an argument parser to run this app from the terminal
-if __name__ == '__main__':
-    app = ASCIIXEL(path='videos/MaxCooper-Aleph2.mp4', ascii_set=2, display_original=False, reverse_colour=False, output_type=OutputType.ASCII_COLOUR, record=True)
-    app.run()
+        if self.custom_resolution: self.cv2_image = cv2.resize(self.cv2_image, (self.ORIGWIDTH, self.ORIGHEIGHT), interpolation=cv2.INTER_AREA)
+        self.cv2_image = cv2.cvtColor(self.cv2_image, cv2.COLOR_BGR2RGB)
+
+        resized_img = self.cv2_image
+        if self.WIDTH: resized_img = cv2.resize(resized_img, (self.WIDTH, self.HEIGHT), interpolation=cv2.INTER_AREA)
+        self.image = cv2.transpose(resized_img)
+        self.grayscale = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+
+    # Draw the classic ASCII
+    def draw_ascii(self) -> None:
+        array_of_values = accelerate_conversion_ascii(self.grayscale, self.WIDTH, self.HEIGHT, self.ASCII_COEFF, self.skip_index)
+        for char_index, (x, y) in array_of_values:
+            self.img_draw.text((x*self.current_element_size, y*self.current_element_size), self.ASCII_CHARS[char_index], fill=self.fg, font=self.font)
+    
+    # Draw the colour ASCII
+    def draw_ascii_colour(self) -> None:
+        array_of_values = accelerate_conversion_ascii_colour(self.image, self.grayscale, self.WIDTH, self.HEIGHT, self.ASCII_COEFF, self.colour_lvl, self.skip_index)
+        for char_index, colour, (x, y) in array_of_values:
+            self.img_draw.text((x*self.current_element_size, y*self.current_element_size), self.ASCII_CHARS[char_index], fill=colour, font=self.font)
+    
+    # Draw the pixel art
+    def draw_pixel(self) -> None:
+        array_of_values = accelerate_conversion_pixel(self.image, self.WIDTH, self.HEIGHT, self.colour_lvl)
+        for colour, (x, y) in array_of_values:
+            self.img_draw.rectangle(
+                [
+                    x*self.current_element_size,
+                    y*self.current_element_size,
+                    (x*self.current_element_size)+self.current_element_size,
+                    (y*self.current_element_size)+self.current_element_size
+                ], fill=colour)
+
+    # Draw the converted frame
+    def draw(self) -> None:
+        self.out_image = Image.new('RGB', (self.ORIGWIDTH, self.ORIGHEIGHT), self.bg)
+        self.img_draw = ImageDraw.Draw(self.out_image)
+
+        self.draw_char()
+        self.get_image()
+
+    # Save an image
+    def save_image(self) -> None:
+        self.out_image.save(f'frames/{self.output_name}_{self.nb_frame:05d}.png')
+
+    # Convert all the frames into a video if record is true
+    def record_video(self) -> None:
+        if self.record:
+            createVideo(self.output_name, self.path, self.rec_fps, self.ORIGWIDTH, self.ORIGHEIGHT)
+
+    # Run one step of the algorithm
+    def runStep(self) -> bool:
+        if self.finish: return self.finish
+
+        self.draw()
+
+        if self.finish: return self.finish
+
+        if self.record:
+            self.save_image()
+
+        self.nb_frame += 1
+
+    # Run the main algorithm
+    def run(self) -> None:
+        if not setup(): return
+
+        while not self.finish:
+           self.runStep()
+        
+        record_video()
