@@ -6,7 +6,7 @@ import cv2
 
 # ASCIIXEL class for images and videos ASCII conversion
 class ASCIIXEL:
-    def __init__(self, path='', ascii_set=2, element_size=12, display_original=True, resolution=None, record=False, reverse_colour=False, output_type=OutputType.ASCII, colour_lvl=8) -> None:
+    def __init__(self, path='', ascii_set=2, element_size=12, display_original=False, resolution=None, record=False, reverse_colour=False, output_type=OutputType.ASCII, colour_lvl=8) -> None:
         self.path = path
         self.output_type = output_type
         self.reverse_colour = reverse_colour
@@ -26,19 +26,25 @@ class ASCIIXEL:
         # Character display settings
         self.element_size = element_size
 
+    # TODO Discard the first frame (glitch)
     def setup(self) -> bool:
         if self.path == '': return False
 
         self.name = self.path.split('/')[-1].split('.')[0]
-        self.output_name = f'ASCIIXEL_{self.name}_{self.output_type.value}'
         self.current_element_size = self.element_size
+        self.output_name = f'ASCIIXEL_{self.name}_{self.output_type.name}_elSize{self.current_element_size}'
+        if self.output_type != OutputType.PIXEL_ART:
+            self.output_name += f'_asciiPal{self.ascii_set}'
+
+        if self.output_type != OutputType.ASCII:
+            self.output_name += f'_colourLvl{self.colour_lvl}'
         
         # Video/Image setup
         self.cap = cv2.VideoCapture(self.path)
         self.get_image()
 
         # Character display settings
-        self.font = ImageFont.load_default(size=self.current_element_size)
+        self.font = ImageFont.load_default()
 
         # Screen settings
         if self.custom_resolution:
@@ -70,6 +76,8 @@ class ASCIIXEL:
         self.ASCII_COEFF = (len(self.ASCII_CHARS)-1)/255
 
         # Selection of the style
+        if self.output_type == OutputType.ASCII:
+            self.draw_char = self.draw_ascii
         if self.output_type == OutputType.ASCII_COLOUR:
             self.draw_char = self.draw_ascii_colour
         elif self.output_type == OutputType.PIXEL_ART:
@@ -111,13 +119,13 @@ class ASCIIXEL:
     def draw_ascii(self) -> None:
         array_of_values = accelerate_conversion_ascii(self.grayscale, self.WIDTH, self.HEIGHT, self.ASCII_COEFF, self.skip_index)
         for char_index, (x, y) in array_of_values:
-            self.img_draw.text((x*self.current_element_size, y*self.current_element_size), self.ASCII_CHARS[char_index], fill=self.fg, font=self.font)
+            self.img_draw.text((x*self.current_element_size, y*self.current_element_size), self.ASCII_CHARS[char_index], fill=self.fg, font=self.font, font_size=self.current_element_size)
     
     # Draw the colour ASCII
     def draw_ascii_colour(self) -> None:
         array_of_values = accelerate_conversion_ascii_colour(self.image, self.grayscale, self.WIDTH, self.HEIGHT, self.ASCII_COEFF, self.colour_lvl, self.skip_index)
         for char_index, colour, (x, y) in array_of_values:
-            self.img_draw.text((x*self.current_element_size, y*self.current_element_size), self.ASCII_CHARS[char_index], fill=colour, font=self.font)
+            self.img_draw.text((x*self.current_element_size, y*self.current_element_size), self.ASCII_CHARS[char_index], fill=colour, font=self.font, font_size=self.current_element_size)
     
     # Draw the pixel art
     def draw_pixel(self) -> None:
@@ -166,6 +174,6 @@ class ASCIIXEL:
         if not setup(): return
 
         while not self.finish:
-           self.runStep()
+            self.runStep()
         
         record_video()

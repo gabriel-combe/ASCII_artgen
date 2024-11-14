@@ -79,10 +79,5 @@ def createFolder() -> None:
         os.mkdir('outputs')
 
 def createVideo(videopath: str, audiopath: str, fps: int, width: int, height: int) -> None:
-    try:
-        os.remove(f'{videopath}')
-    except FileNotFoundError:
-        print("File is not present in the system.")
-
-    os.system(f'ffmpeg -r {str(fps)} -f image2 -s {width}x{height} -i frames/{videopath}_%05d.png -i {audiopath} -crf 25 -vcodec libx264 -pix_fmt yuv420p outputs/{videopath}.mp4')
+    os.system(f'ffmpeg -r {str(fps)} -f image2 -s {width}x{height} -i frames/{videopath}_%05d.png -i {audiopath} -map 0 -map 1:a -crf 25 -vcodec libx264 -pix_fmt yuv420p outputs/{videopath}.mp4')
     shutil.rmtree('frames', ignore_errors=True)

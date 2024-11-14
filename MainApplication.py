@@ -1,6 +1,7 @@
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QWidget, QLineEdit, QPushButton, QCheckBox, QComboBox, QSpinBox, QVBoxLayout, QHBoxLayout, QGridLayout, QFileDialog
+from PySide6.QtWidgets import QApplication, QMainWindow, QGroupBox, QLabel, QWidget, QLineEdit, QPushButton, QCheckBox, QComboBox, QSpinBox, QVBoxLayout, QHBoxLayout, QGridLayout, QFileDialog
 from PySide6.QtCore import QObject, QThread, Signal, Slot, Qt, QSize
 from PySide6.QtGui import QPixmap, QResizeEvent
+import qdarkstyle
 from PIL.ImageQt import ImageQt
 from PIL import Image
 from ASCIIXEL import ASCIIXEL
@@ -26,28 +27,46 @@ class MainWindow(QMainWindow):
         self.settingsLayout = QGridLayout()
         self.buttonLayout = QHBoxLayout()
         self.videoLayout = QHBoxLayout()
+        self.typeLayout = QVBoxLayout()
+        self.asciiSetLayout = QVBoxLayout()
+        self.elementSizeLayout = QVBoxLayout()
+        self.colourLevelLayout = QVBoxLayout()
+
+        # Create a group box for the settings
+        self.settingsGroupBox = QGroupBox("Settings")
 
         # Create all the Widgets
         self.textQuery = QLabel(text="Enter the path of the video to convert: ")
         self.videoPath = QLineEdit()
         self.videoSearchButton = QPushButton(text="Open File")
-        self.displayOrigCheckBox = QCheckBox(text="Display Original")
-        self.reverseColourCheckBox = QCheckBox(text="Reverse Colour")
-        self.asciiSetComboBox = QComboBox()
-        for el in ASCII_CHARS_TAB:
-            self.asciiSetComboBox.addItem(el)
 
+        self.typeLabel = QLabel(text="Render Type")
         self.typeComboBox = QComboBox()
         for el in OutputType:
             self.typeComboBox.addItem(el.name)
+        self.typeComboBox.setCurrentIndex(self.app_ASCIIXEL.output_type.value)
 
+        self.asciiSetLabel = QLabel(text="ASCII Palette")
+        self.asciiSetComboBox = QComboBox()
+        for el in ASCII_CHARS_TAB:
+            self.asciiSetComboBox.addItem(el)
+        self.asciiSetComboBox.setCurrentIndex(self.app_ASCIIXEL.ascii_set)
+
+        self.elementSizeLabel = QLabel(text="Element Size")
         self.elementSizeSpinBox = QSpinBox()
         self.elementSizeSpinBox.setMinimum(1)
-        self.elementSizeSpinBox.setValue(12)
+        self.elementSizeSpinBox.setValue(self.app_ASCIIXEL.element_size)
 
+        self.colourLevelLabel = QLabel(text="Colour Level")
         self.colourLevelSpinBox = QSpinBox()
         self.colourLevelSpinBox.setMinimum(2)
-        self.colourLevelSpinBox.setValue(8)
+        self.colourLevelSpinBox.setValue(self.app_ASCIIXEL.colour_lvl)
+
+        self.displayOrigCheckBox = QCheckBox(text="Display Original")
+        self.displayOrigCheckBox.setChecked(self.app_ASCIIXEL.display_original)
+
+        self.reverseColourCheckBox = QCheckBox(text="Reverse Colour")
+        self.reverseColourCheckBox.setChecked(self.app_ASCIIXEL.reverse_colour)
 
         self.previewButton = QPushButton(text="Run Preview")
         self.recordButton = QPushButton(text="Record")
@@ -58,12 +77,26 @@ class MainWindow(QMainWindow):
         self.pathLayout.addWidget(self.videoPath)
         self.pathLayout.addWidget(self.videoSearchButton)
 
-        self.settingsLayout.addWidget(self.displayOrigCheckBox, 0, 0)
-        self.settingsLayout.addWidget(self.reverseColourCheckBox, 1, 0)
-        self.settingsLayout.addWidget(self.asciiSetComboBox, 0, 1)
-        self.settingsLayout.addWidget(self.typeComboBox, 0, 2)
-        self.settingsLayout.addWidget(self.elementSizeSpinBox, 1, 1)
-        self.settingsLayout.addWidget(self.colourLevelSpinBox, 1, 2)
+        self.typeLayout.addWidget(self.typeLabel)
+        self.typeLayout.addWidget(self.typeComboBox)
+        self.settingsLayout.addLayout(self.typeLayout, 0, 0, 1, 2)
+
+        self.asciiSetLayout.addWidget(self.asciiSetLabel)
+        self.asciiSetLayout.addWidget(self.asciiSetComboBox)
+        self.settingsLayout.addLayout(self.asciiSetLayout, 1, 0, 1, 2)
+
+        self.elementSizeLayout.addWidget(self.elementSizeLabel)
+        self.elementSizeLayout.addWidget(self.elementSizeSpinBox)
+        self.settingsLayout.addLayout(self.elementSizeLayout, 2, 0, 1, 2)
+
+        self.colourLevelLayout.addWidget(self.colourLevelLabel)
+        self.colourLevelLayout.addWidget(self.colourLevelSpinBox)
+        self.settingsLayout.addLayout(self.colourLevelLayout, 3, 0, 1, 2)
+
+        self.settingsLayout.addWidget(self.displayOrigCheckBox, 4, 0)
+        self.settingsLayout.addWidget(self.reverseColourCheckBox, 4, 1)
+
+        self.settingsGroupBox.setLayout(self.settingsLayout)
 
         self.buttonLayout.addWidget(self.previewButton)
         self.buttonLayout.addWidget(self.recordButton)
@@ -73,7 +106,7 @@ class MainWindow(QMainWindow):
 
         self.layout.addWidget(self.textQuery)
         self.layout.addLayout(self.pathLayout)
-        self.layout.addLayout(self.settingsLayout)
+        self.layout.addWidget(self.settingsGroupBox)
         self.layout.addLayout(self.buttonLayout)
         self.layout.addLayout(self.videoLayout)
 
@@ -92,15 +125,13 @@ class MainWindow(QMainWindow):
         self.previewButton.clicked.connect(self.clickPreview)
         self.recordButton.clicked.connect(self.clickRecord)
 
-        self.onStatesChanged()
-
         # Set default properties of the main window
-        self.resize(800, 100)
         self.central_widget.setLayout(self.layout)
 
         # Create the Worker Thread Object
         self.instanced_thread = WorkerThread(self, self.app_ASCIIXEL)
 
+    # Search video file
     def search(self) -> None:
         videoPathName = QFileDialog.getOpenFileName(caption="Open File", dir="/", filter="Video (*.mp4 *.mov *.mkv)")
         
@@ -112,6 +143,7 @@ class MainWindow(QMainWindow):
         self.videoPath.setText(videoPathName[0])
         self.app_ASCIIXEL.path = videoPathName[0]
 
+    # Modify ASCIIXEL when any checkbox change
     def onStatesChanged(self) -> None:
         self.app_ASCIIXEL.display_original = self.displayOrigCheckBox.isChecked()
         if not self.app_ASCIIXEL.display_original:
@@ -119,18 +151,23 @@ class MainWindow(QMainWindow):
 
         self.app_ASCIIXEL.reverse_colour = self.reverseColourCheckBox.isChecked()
 
-    def onAsciiSetIndexChanged(self, index) -> None:
-        self.app_ASCIIXEL.ascii_set = index
-
+    # Modify the output type
     def onTypeIndexChanged(self, index) -> None:
         self.app_ASCIIXEL.output_type = OutputType(index)
 
+    # Modify the ascii set used
+    def onAsciiSetIndexChanged(self, index) -> None:
+        self.app_ASCIIXEL.ascii_set = index
+
+    # Modify the size of the element displayed (character or pixel)
     def onElementSizeValueChanged(self, value) -> None:
         self.app_ASCIIXEL.element_size = value
 
+    # Modify the number of colour used
     def onColourLevelValueChanged(self, value) -> None:
         self.app_ASCIIXEL.colour_lvl = value
 
+    # Start ASCIIXEL app in a thread without saving the output
     def clickPreview(self) -> None:
         # Kill thread if it is running
         if self.instanced_thread.isRunning:
@@ -144,6 +181,7 @@ class MainWindow(QMainWindow):
         # Start a new thread
         self.instanced_thread.start()
 
+    # Start ASCIIXEL app in a thread and save the output
     def clickRecord(self) -> None:
         # Kill thread if it is running
         if self.instanced_thread.isRunning:
@@ -157,10 +195,12 @@ class MainWindow(QMainWindow):
         # Start a new thread
         self.instanced_thread.start()
 
+    # Slot for communicating with the thread worker to get the result image
     @Slot(QPixmap)
     def updateResultImageField(self, img):
         self.videoLabel.setPixmap(img)
 
+    # Slot for communicating with the thread worker to get the original image
     @Slot(QPixmap)
     def updateOrigImageField(self, img):
         self.videoOrigLabel.setPixmap(img)
@@ -195,6 +235,8 @@ class WorkerThread(QThread):
                 pil_img_orig = Image.fromarray(self.app_ASCIIXEL.cv2_image).convert('RGB')
                 img_orig = QPixmap.fromImage(ImageQt(pil_img_orig))
                 self.signals.signal_img_orig.emit(img_orig)
+            
+        self.app_ASCIIXEL.record_video()
     
     def stop(self) -> None:
         self.terminate()
@@ -207,6 +249,8 @@ if __name__ == '__main__':
 #     app.run()
 
     app = QApplication(sys.argv)
+    app.setStyleSheet(qdarkstyle.load_stylesheet_pyside6())
+
     mainWindow = MainWindow()
     mainWindow.show()
 
