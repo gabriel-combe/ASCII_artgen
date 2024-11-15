@@ -69,6 +69,7 @@ def accelerate_conversion_pixel(image: np.ndarray, width: int, height: int, colo
 
 ##### Folder Managment Functions #####
 
+# TODO Fix os.path.exists not detecting the folder
 def createFolder() -> None:
     if os.path.exists('frames'):
         shutil.rmtree('frames', ignore_errors=True)

@@ -16,6 +16,9 @@ class MainWindow(QMainWindow):
 
         self.app_ASCIIXEL = ASCIIXEL()
 
+        # Create the Worker Thread Object
+        self.instanced_thread = WorkerThread(self, self.app_ASCIIXEL)
+
         self.setWindowTitle("ASCIIXEL")
 
         self.central_widget = QWidget()
@@ -70,6 +73,7 @@ class MainWindow(QMainWindow):
 
         self.previewButton = QPushButton(text="Run Preview")
         self.recordButton = QPushButton(text="Record")
+        self.cancelButton = QPushButton(text="Cancel")
         self.videoLabel = QLabel()
         self.videoOrigLabel = QLabel()
 
@@ -100,6 +104,7 @@ class MainWindow(QMainWindow):
 
         self.buttonLayout.addWidget(self.previewButton)
         self.buttonLayout.addWidget(self.recordButton)
+        self.buttonLayout.addWidget(self.cancelButton)
 
         self.videoLayout.addWidget(self.videoLabel)
         self.videoLayout.addWidget(self.videoOrigLabel)
@@ -124,12 +129,11 @@ class MainWindow(QMainWindow):
         self.colourLevelSpinBox.valueChanged.connect(self.onColourLevelValueChanged)
         self.previewButton.clicked.connect(self.clickPreview)
         self.recordButton.clicked.connect(self.clickRecord)
+        self.cancelButton.clicked.connect(self.instanced_thread.stop)
 
         # Set default properties of the main window
         self.central_widget.setLayout(self.layout)
 
-        # Create the Worker Thread Object
-        self.instanced_thread = WorkerThread(self, self.app_ASCIIXEL)
 
     # Search video file
     def search(self) -> None:
@@ -169,9 +173,7 @@ class MainWindow(QMainWindow):
 
     # Start ASCIIXEL app in a thread without saving the output
     def clickPreview(self) -> None:
-        # Kill thread if it is running
-        if self.instanced_thread.isRunning:
-            self.instanced_thread.stop()
+        self.clickCancel()
 
         # Set asciixel properties and run the setup
         self.app_ASCIIXEL.reset()
@@ -183,9 +185,7 @@ class MainWindow(QMainWindow):
 
     # Start ASCIIXEL app in a thread and save the output
     def clickRecord(self) -> None:
-        # Kill thread if it is running
-        if self.instanced_thread.isRunning:
-            self.instanced_thread.stop()
+        self.clickCancel()
 
         # Set asciixel properties and run the setup
         self.app_ASCIIXEL.reset()
@@ -194,6 +194,12 @@ class MainWindow(QMainWindow):
 
         # Start a new thread
         self.instanced_thread.start()
+    
+    # Cancel the ASCIIXEL app thread
+    def clickCancel(self) -> None:
+        # Kill thread if it is running
+        if self.instanced_thread.isRunning():
+            self.instanced_thread.stop()
 
     # Slot for communicating with the thread worker to get the result image
     @Slot(QPixmap)
@@ -218,6 +224,8 @@ class WorkerThread(QThread):
 
         self.app_ASCIIXEL = app_ASCIIXEL
 
+        self.exit = False
+
         # Instantiate signals and connect signals to slots
         self.signals = ImgSignals()
         self.signals.signal_img.connect(parent.updateResultImageField)
@@ -227,6 +235,10 @@ class WorkerThread(QThread):
         if self.app_ASCIIXEL == None: return
 
         while not self.app_ASCIIXEL.finish:
+            if self.exit:
+                self.exit = False
+                return
+
             self.app_ASCIIXEL.runStep()
             img = QPixmap.fromImage(ImageQt(self.app_ASCIIXEL.out_image))
             self.signals.signal_img.emit(img)
@@ -235,13 +247,12 @@ class WorkerThread(QThread):
                 pil_img_orig = Image.fromarray(self.app_ASCIIXEL.cv2_image).convert('RGB')
                 img_orig = QPixmap.fromImage(ImageQt(pil_img_orig))
                 self.signals.signal_img_orig.emit(img_orig)
-            
+
         self.app_ASCIIXEL.record_video()
     
+    @Slot()
     def stop(self) -> None:
-        self.terminate()
-    
-
+        self.exit = True
 
 
 if __name__ == '__main__':

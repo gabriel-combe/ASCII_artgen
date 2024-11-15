@@ -26,7 +26,6 @@ class ASCIIXEL:
         # Character display settings
         self.element_size = element_size
 
-    # TODO Discard the first frame (glitch)
     def setup(self) -> bool:
         if self.path == '': return False
 
@@ -56,10 +55,6 @@ class ASCIIXEL:
 
         self.original_ratio = self.ORIGHEIGHT/self.ORIGWIDTH
         self.ratio = self.HEIGHT/self.WIDTH
-
-        # Resize first frame
-        self.image = cv2.resize(self.image, (self.WIDTH, self.HEIGHT), interpolation=cv2.INTER_AREA)
-        self.grayscale = cv2.resize(self.grayscale, (self.WIDTH, self.HEIGHT), interpolation=cv2.INTER_AREA)
 
         # Display settings
         self.bg = 'white' if self.reverse_colour else 'black'
@@ -144,8 +139,8 @@ class ASCIIXEL:
         self.out_image = Image.new('RGB', (self.ORIGWIDTH, self.ORIGHEIGHT), self.bg)
         self.img_draw = ImageDraw.Draw(self.out_image)
 
-        self.draw_char()
         self.get_image()
+        self.draw_char()
 
     # Save an image
     def save_image(self) -> None:
