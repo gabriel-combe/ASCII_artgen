@@ -10,14 +10,9 @@ Only python is needed, with numpy, OpenCV, and Pygame libraries.
 
 ## Usage example
 
-Run the ASCIIXEL python file to start the generation.
-To modify the video to convert and the parameters of the generator, change the following line:
-
-```py
-app = ASCIIXEL(path='YOUR_VIDEO', ascii_set=2, display_original=False, reverse_colour=False, output_type=OutputType.ASCII_COLOUR, record=True)
-```
-
-> I will add argument parser in the futur.
+Run the MainApplication python file to start ASCIIXEL.
+You can modify the render type (ASCII, ASCII COLOUR, PIXEL ART), the ASCII palette, the element size, and the number of colours used (for ASCII COLOUR and PIXEL ART).
+After adjusting the parameters, you can run a preview or record the result.
 
 ## Meta
 
