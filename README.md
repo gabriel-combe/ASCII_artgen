@@ -6,7 +6,10 @@ ASCIIXEL can generate images an videos using ASCII character or large pixels (wi
 
 ## Installation
 
-Only python is needed, with numpy, OpenCV, and Pygame libraries.
+You can install all the requirements with the following command.
+```sh
+pip install -r requirements.txt
+```
 
 ## Usage example
 
