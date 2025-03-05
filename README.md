@@ -14,6 +14,8 @@ Run the MainApplication python file to start ASCIIXEL.
 You can modify the render type (ASCII, ASCII COLOUR, PIXEL ART), the ASCII palette, the element size, and the number of colours used (for ASCII COLOUR and PIXEL ART).
 After adjusting the parameters, you can run a preview or record the result.
 
+![](img/ASCIXEL_interface.png)
+
 ## Meta
 
 [Gabriel Combe-Ounkham](https://github.com/gabriel-combe)
