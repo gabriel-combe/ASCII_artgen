@@ -1,12 +1,13 @@
 from PIL import Image, ImageFont, ImageDraw
 from utils import ASCII_CHARS_TAB, OutputType, accelerate_conversion_ascii, accelerate_conversion_ascii_colour, accelerate_conversion_pixel, createFolder, createVideo
+from typing import Tuple
 import numpy as np
 import cv2
 
 
 # ASCIIXEL class for images and videos ASCII conversion
 class ASCIIXEL:
-    def __init__(self, path='', ascii_set=2, element_size=12, display_original=False, resolution=None, record=False, reverse_colour=False, output_type=OutputType.ASCII, colour_lvl=8) -> None:
+    def __init__(self, path: str ='', ascii_set: int =2, element_size: int =12, display_original: bool =False, resolution: Tuple(int, int) =None, record: bool =False, reverse_colour: bool =False, output_type: OutputType =OutputType.ASCII, colour_lvl: int =8) -> None:
         self.path = path
         self.output_type = output_type
         self.reverse_colour = reverse_colour
